@@ -1,5 +1,5 @@
 // server.js
-import http from "http";
+const http = require("http");
 import mysql from "mysql2/promise";
 import dotenv from "dotenv";
 
