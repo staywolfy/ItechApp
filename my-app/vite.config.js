@@ -63,7 +63,7 @@ export default defineConfig({
       workbox: {
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/localhost:5000\/.*/i,
+            urlPattern: /^https:\/\/studentinfoapp.i-tech.net.in\/.*/i,
             handler: "NetworkFirst",
             options: {
               cacheName: "api-cache",

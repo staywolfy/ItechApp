@@ -20,8 +20,8 @@ function App() {
         hasManifest: !!document.querySelector('link[rel="manifest"]'),
         hasServiceWorker: 'serviceWorker' in navigator,
         isHTTPS: window.location.protocol === 'https:',
-        isLocalhost: window.location.hostname === 'localhost',
-        isSecure: window.location.protocol === 'https:' || window.location.hostname === 'localhost',
+        isLocalhost: window.location.hostname === 'studentinfoapp.i-tech.net.in',
+        isSecure: window.location.protocol === 'https:' || window.location.hostname === 'studentinfoapp.i-tech.net.in',
         hasIcons: false,
         hasStartUrl: false,
         hasDisplayMode: false
