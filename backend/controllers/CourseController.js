@@ -1,100 +1,65 @@
-// controllers/courseController.js
-import db from "../utils/utils.js";
+// controllers/CourseController.js
+import { db } from "../server.js"; // ✅ Import DB connection
 
-export const getPursuingCourses = async (req, res) => {
-  const studentId = req.query.name_contactid;
-
-  if (!studentId) {
-    return res.status(400).json({ message: "studentId query parameter is required" });
-  }
-
+export const getCourseDetails = async (req, res) => {
   try {
-    const [rows] = await db.query(
-      `SELECT f.course AS id, c.name 
-       FROM faculty_student f
-       JOIN course c ON c.id = f.course_id
-       WHERE f.student_id = ? AND f.status = 'pursuing'`,
-      [studentId]
-    );
-    res.json({ courses: rows });
-  } catch (err) {
-    console.error("Error fetching pursuing courses:", err);
-    res.status(500).json({ message: err.message });
-  }
-};
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const name_contactid = url.searchParams.get("name_contactid");
+    const course = url.searchParams.get("course");
 
-export const getCompletedCourses = async (req, res) => {
-  const studentId = req.query.studentId;
-
-  if (!studentId) {
-    return res.status(400).json({ message: "studentId query parameter is required" });
-  }
-
-  try {
-    const [rows] = await db.query(
-      `SELECT f.course_id AS id, c.name 
-       FROM faculty_student f
-       JOIN course c ON c.id = f.course_id
-       WHERE f.student_id = ? AND f.status = 'completed'
-       UNION
-       SELECT s.course_id AS id, c.name 
-       FROM student s
-       JOIN course c ON c.id = s.course_id
-       WHERE s.id = ? AND s.completed = 1`,
-      [studentId, studentId]
-    );
-    res.json({ courses: rows });
-  } catch (err) {
-    console.error("Error fetching completed courses:", err);
-    res.status(500).json({ message: err.message });
-  }
-};
-
-export const getPendingCourses = async (req, res) => {
-  const studentId = req.query.studentId;
-
-  if (!studentId) {
-    return res.status(400).json({ message: "studentId query parameter is required" });
-  }
-
-  try {
-    // Get student's course_id first
-    const [[student]] = await db.query(
-      "SELECT course_id FROM student WHERE id = ?",
-      [studentId]
-    );
-
-    if (!student) {
-      return res.status(404).json({ message: "Student not found" });
+    if (!name_contactid || !course) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      return res.end(
+        JSON.stringify({
+          success: false,
+          message: "Missing name_contactid or course",
+        })
+      );
     }
 
-    // Get all subjects for the course
-    const [allSubjects] = await db.query(
-      "SELECT id, name FROM subject WHERE course_id = ?",
-      [student.course_id]
+    console.log("🔍 Fetching course details for:", { name_contactid, course });
+
+    // ✅ Persuing subjects
+    const [persuing] = await db.query(
+      "SELECT subject FROM faculty_student WHERE nameid = ? AND course = ? AND status = 'Persuing'",
+      [name_contactid, course]
     );
 
-    // Get completed and pursuing subject IDs
-    const [completedSubjects] = await db.query(
-      `SELECT subject_id FROM completed_subjects WHERE student_id = ?`,
-      [studentId]
-    );
-    const [pursuingSubjects] = await db.query(
-      `SELECT subject_id FROM pursuing_subjects WHERE student_id = ?`,
-      [studentId]
+    // ✅ Completed subjects
+    const [completed] = await db.query(
+      "SELECT subject FROM faculty_student WHERE nameid = ? AND course = ? AND status = 'Completed'",
+      [name_contactid, course]
     );
 
-    const completedIds = new Set(completedSubjects.map((s) => s.subject_id));
-    const pursuingIds = new Set(pursuingSubjects.map((s) => s.subject_id));
-
-    // Filter subjects to those NOT completed or pursuing
-    const pending = allSubjects.filter(
-      (subject) => !completedIds.has(subject.id) && !pursuingIds.has(subject.id)
+    // ✅ Pending subjects (not in completed or persuing)
+    const [pending] = await db.query(
+      `SELECT s.subjectname AS subjectname
+       FROM subject s
+       WHERE s.coursename = ?
+         AND s.subjectname COLLATE utf8mb4_general_ci NOT IN (
+           SELECT subject COLLATE utf8mb4_general_ci
+           FROM faculty_student
+           WHERE nameid = ?
+             AND course = ?
+             AND status IN ('Completed', 'Persuing')
+         )`,
+      [course, name_contactid, course]
     );
 
-    res.json({ courses: pending });
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(
+      JSON.stringify({
+        success: true,
+        data: {
+          persuingSubjects: persuing,
+          completedSubjects: completed,
+          pendingSubjects: pending,
+        },
+      })
+    );
   } catch (err) {
-    console.error("Error fetching pending courses:", err);
-    res.status(500).json({ message: err.message });
+    console.error("❌ Course details error:", err);
+    res.writeHead(500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ success: false, message: err.message }));
   }
 };
